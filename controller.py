@@ -12,27 +12,35 @@ from config import Config
 
 CHANNEL = 'pcposc1_to_uhams02a'
 
+'''
+Todo:
+  - files which are not in L1 will be removed from L2
+'''
+
+'''
+Invariants :
+ - L1: list of files on the LOCAL host
+   =self.__get_fn_list_local()
+
+ - L2: list of files that have already been synch'ed:
+   =self.__get_fn_list_remote()
+
+ - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
+ - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
+ 
+'''
+
 class Controller():
 
     def __init__(self):
-        '''
-        Invariants :
-        - L1: list of files on the LOCAL host
-          = self.__get_L1()
-        - L2: list of files that have already been synch'ed:
-          (files which are not in L1 will be removed from L2)
-          = 
-        - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
-        - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
-        '''
+        self.__logger = Logger()
 
         self.__check_if_process_is_running()
 
         self.config = Config(CHANNEL).get()
-        self.log(config)
+        self.log(str(self.config))
         
         self.__L2 = []
-        self.__logger = Logger()
         self.dumper = Dumper(self.__logger)
 
     
@@ -67,7 +75,7 @@ class Controller():
         while (True):
             self.log("\n"+str(datetime.datetime.now()))
             
-            fn_list_local = self.__get_L1()
+            fn_list_local = self.__get_fn_list_local()
             self.log("L1 : " + str(fn_list_local))
 
             self.log("L2 : " + str(fn_list_synched))
@@ -78,8 +86,13 @@ class Controller():
             fn_list_to_sync = [x for x in fn_list_local_recent if x not in fn_list_synched]
             fn_list_to_sync_b = fn_list_to_sync[:self.config.batch_size]
             self.log("L4 : " + str(fn_list_to_sync_b))
-        
-            self.__sync(fn_list_to_sync_b)
+
+            if (len(fn_list_to_sync_b)) == 0:
+                sleep(self.config.connection_freq_whenempty)
+                continue
+            
+            #self.__sync(fn_list_to_sync_b)
+            self.__syncBatch(fn_list_to_sync_b)
 
             fn_list_synched += fn_list_to_sync_b
             self.log("L2': " + str(fn_list_synched))
@@ -95,29 +108,28 @@ class Controller():
         CMD = "find " + self.config.rem_path + " -type f -printf \'%P \'"
 
         ssh_command = "ssh -q" + ' ' + KEY + ' ' + PORT + ' ' + USER + ' ' + self.config.rem_host + ' \"' + CMD + '\"'
-        self.log("ssh command: " + ssh_command)
-        
         output = self.__popen(ssh_command)
-        fn_list = output.rstrip(' ').split(' ')
+        output_str = output.rstrip(' ')
+        if (len(output_str)) == 0:
+            return []
+        
+        fn_list = output_str.split(' ')
         fn_list.sort()
         return fn_list
 
 
-    def __get_L1(self):
+    def __get_fn_list_local(self):
         '''
-        Return:
-        List of filename to be copied to REMOTE, the oldest files (limited by STORE_SIZE)
-        which has not yet been copied.
-        Size of the list is BATCH_SIZE. 
         Return example: ["3770/000 3770/001"]
 
-        Command:
-        find  ./data/FRAMES/SCIBPB/RT/ -type f -printf "%P\n"
+        Command: find ./data/FRAMES/SCIBPB/RT/ -type f -printf '%P '"
           : -type f       = not to print folders
           : -printf '%P'  = to print file name with the path removed
           :         '%P ' = to insert a 'space'
         '''
-        cmd = "find " + self.config.loc_path + " -type f -printf '%P '"
+        REGEX = "-regextype sed -regex \"" + self.config.loc_path + "[0-9]\{4\}\/[0-9]\{3\}\""
+        
+        cmd = "find" + ' ' + self.config.loc_path + ' '+ REGEX  + ' ' + "-type f -printf '%P '"
         output = self.__popen(cmd)
         fn_list_local = output.rstrip(' ').split(' ')
         fn_list_local.sort()
@@ -126,17 +138,20 @@ class Controller():
     def __sync(self, fn_list):
         for fn in fn_list:
             ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
-            cmd = "rsync -Rpogt " + self.config.loc_path + './' + fn + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
-            self.__call(cmd)
+            cmd = "rsync -Rpogt --progress " + self.config.loc_path + './' + fn + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
+            self.log(" ! RSYNC : " + cmd)
+            subprocess.call(cmd, shell=True)
 
-        
-    def __call(self, cmd):
-        self.log("!   CALL : " + cmd)
+    def __syncBatch(self, fn_list):
+        self.log(" ! --->  RSYNC : " + cmd)
+        fnbatch = (" "+self.config.loc_path+'./').join(fn_list)
+        ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
+        cmd = "rsync -Rpogt --progress " + self.config.loc_path+'./'+fnbatch + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
+        self.log(" ! --->  RSYNC : " + cmd)
         subprocess.call(cmd, shell=True)
 
-
     def __popen(self, cmd):
-        self.log("!   CALL : " + cmd)
+        self.log(" ! CALL : " + cmd)
         p = subprocess.Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate()
         
