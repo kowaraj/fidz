@@ -6,12 +6,14 @@
 		"rem_port" : 25852,
 		"rem_user" : "amscern",
 	
-	        "loc_path"   : "/home/ams/src/test_rsync/data/FRAMES/SCIBPB/RT/",
+	        "loc_path"   : "/Data/FRAMES/SCIBPB/RT/",
 		"loc_sshkey" : "/home/ams/.ssh/ams_fcern2hawaii",
 	
-		"storage_size"    : 3,	
-		"batch_size"      : 2,
-        	"connection_freq" : 60
+		"storage_size"    : 30,	
+		"batch_size"      : 3,
+		
+        	"connection_freq" : 2,
+		"connection_freq_whenempty" : 60
         }
 }
 

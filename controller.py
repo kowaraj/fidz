@@ -23,10 +23,12 @@ Invariants :
    =self.__get_fn_list_local()
 
  - L2: list of files that have already been synch'ed:
+   (and not yet deleted from remote due to >=STORAGE_SIZE)
    =self.__get_fn_list_remote()
 
  - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
  - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
+ - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
  
 '''
 
@@ -68,36 +70,48 @@ class Controller():
         self.__logger.logerror(msg+ '\n')
 
     def run(self):
-        self.log("run: going into an infinite loop...")
-
         fn_list_synched = self.__get_fn_list_remote()
-
         while (True):
             self.log("\n"+str(datetime.datetime.now()))
+
+            # 1. Prepare the list of files to be synchronized
             
-            fn_list_local = self.__get_fn_list_local()
-            self.log("L1 : " + str(fn_list_local))
+            fn_list_local = self.__get_fn_list_local() # check local files
+            self.log("L1 : (part of) " + str(fn_list_local[-(self.config.storage_size+3):]))
 
-            self.log("L2 : " + str(fn_list_synched))
+            self.log("L2 : " + str(fn_list_synched)) # check already synchronized files
 
-            fn_list_local_recent = fn_list_local[-self.config.storage_size:]
+            fn_list_local_recent = fn_list_local[-self.config.storage_size:] # ignore old local files
             self.log("L3 : " + str(fn_list_local_recent))
 
-            fn_list_to_sync = [x for x in fn_list_local_recent if x not in fn_list_synched]
+            fn_list_to_sync = [x for x in fn_list_local_recent if x not in fn_list_synched] # find files to be synchronized
             fn_list_to_sync_b = fn_list_to_sync[:self.config.batch_size]
             self.log("L4 : " + str(fn_list_to_sync_b))
 
-            if (len(fn_list_to_sync_b)) == 0:
+            if (len(fn_list_to_sync_b)) != 0:
+
+                # 2. Run the synchronization (rsync)
+
+                self.__syncBatch(fn_list_to_sync_b)  # for single file mode: self.__sync(fn_list_to_sync_b)
+                fn_list_synched += fn_list_to_sync_b
+                self.log("L2': " + str(fn_list_synched))
+                
+            # 3. Delete oldest files from remote (clean-up)
+
+
+            fn_list_to_del = fn_list_synched[:-self.config.storage_size] # find too old files on remote
+            self.log("L5 : " + str(fn_list_to_del)) # too old files on remote (to be deleted)
+            if (len(fn_list_to_del)) != 0:
+                self.__delete_remote_files(fn_list_to_del)
+                fn_list_synched = [x for x in fn_list_synched if x not in fn_list_to_del] # UPDATE synched list: Find files that were not deleted from remote
+
+            # 4. Nothing to be done: Long wait; else: Short wait.
+                
+            if ( (len(fn_list_to_sync_b) == 0) and (len(fn_list_to_del) == 0) ):
+                self.log("No missing files. Nothing to sync. Waiting...")
                 sleep(self.config.connection_freq_whenempty)
-                continue
-            
-            #self.__sync(fn_list_to_sync_b)
-            self.__syncBatch(fn_list_to_sync_b)
-
-            fn_list_synched += fn_list_to_sync_b
-            self.log("L2': " + str(fn_list_synched))
-
-            sleep(self.config.connection_freq)
+            else: 
+                sleep(self.config.connection_freq)
 
     def __get_fn_list_remote(self):
 
@@ -135,6 +149,22 @@ class Controller():
         fn_list_local.sort()
         return fn_list_local
     
+    def __delete_remote_files(self, fn_list_to_del):
+        self.log("TO BE DELETED from REMOTE!!! : \n >>> " + str(fn_list_to_del))
+
+        # ssh command:
+        KEY = "-i " + self.config.loc_sshkey
+        PORT = "-p " + str(self.config.rem_port)
+        USER = "-l " + str(self.config.rem_user)
+
+        fn_list = self.config.rem_path + (" " + self.config.rem_path).join(fn_list_to_del)
+        CMD = "rm " + fn_list
+
+        ssh_command = "ssh -q" + ' ' + KEY + ' ' + PORT + ' ' + USER + ' ' + self.config.rem_host + ' \"' + CMD + '\"'
+        output = self.__popen(ssh_command)
+        self.log("output:" + output)
+
+        
     def __sync(self, fn_list):
         for fn in fn_list:
             ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
@@ -143,7 +173,7 @@ class Controller():
             subprocess.call(cmd, shell=True)
 
     def __syncBatch(self, fn_list):
-        self.log(" ! --->  RSYNC : " + cmd)
+
         fnbatch = (" "+self.config.loc_path+'./').join(fn_list)
         ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
         cmd = "rsync -Rpogt --progress " + self.config.loc_path+'./'+fnbatch + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
