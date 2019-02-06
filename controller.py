@@ -13,13 +13,25 @@ from config import Config
 CHANNEL = 'pcposc1_to_uhams02a'
 
 '''
-Todo:
-  - files which are not in L1 will be removed from L2
-'''
+TODO:
 
-'''
-Invariants :
- - L1: list of files on the LOCAL host
+  - ...
+
+VERSION:
+
+  - 2019.02.06
+
+
+  
+  - 2019.02.05
+
+    Add a regex to the command to find the files on the remote host (already synchronized files).
+    Otherwise, it finds a partially trasnferred file and throws an error (to be understood why).
+
+
+INVARIANTS :
+
+  - L1: list of files on the LOCAL host
    =self.__get_fn_list_local()
 
  - L2: list of files that have already been synch'ed:
@@ -69,6 +81,12 @@ class Controller():
     def logerror(self, msg):
         self.__logger.logerror(msg+ '\n')
 
+    def logsynched(self, fn_list):
+        self.__logger.logsynched(fn_list)
+
+    def logdeleted(self, fn_list):
+        self.__logger.logdeleted(fn_list)
+
     def run(self):
         fn_list_synched = self.__get_fn_list_remote()
         while (True):
@@ -114,12 +132,29 @@ class Controller():
                 sleep(self.config.connection_freq)
 
     def __get_fn_list_remote(self):
-
+        '''
+        Example of a complete command:
+          ssh
+          -q
+          -i /home/ams/.ssh/ams_fcern2hawaii
+          -p 25852
+          -l amscern
+          uhams02a.phys.hawaii.edu
+          "find /home/cern/amscern/cern_to_hawaii/
+             -regextype sed
+             -regex '/home/cern/amscern/cern_to_hawaii/[0-9]\{4\}\/[0-9]\{3\}'
+             -type f
+             -printf '%P '
+          "
+        '''
+        
         # ssh command:
         KEY = "-i " + self.config.loc_sshkey
         PORT = "-p " + str(self.config.rem_port)
         USER = "-l " + str(self.config.rem_user)
-        CMD = "find " + self.config.rem_path + " -type f -printf \'%P \'"
+        REGEX = "-regextype sed -regex \'" + self.config.rem_path + "[0-9]\{4\}\/[0-9]\{3\}\'"
+
+        CMD = "find " + self.config.rem_path + ' ' + REGEX  + ' ' + " -type f -printf \'%P \'"
 
         ssh_command = "ssh -q" + ' ' + KEY + ' ' + PORT + ' ' + USER + ' ' + self.config.rem_host + ' \"' + CMD + '\"'
         output = self.__popen(ssh_command)
@@ -140,7 +175,16 @@ class Controller():
           : -type f       = not to print folders
           : -printf '%P'  = to print file name with the path removed
           :         '%P ' = to insert a 'space'
+
+        Example of a complete command:
+          find
+          /Data/FRAMES/SCIBPB/RT/
+          -regextype sed
+          -regex "/Data/FRAMES/SCIBPB/RT/[0-9]\{4\}\/[0-9]\{3\}"
+          -type f
+          -printf '%P '
         '''
+
         REGEX = "-regextype sed -regex \"" + self.config.loc_path + "[0-9]\{4\}\/[0-9]\{3\}\""
         
         cmd = "find" + ' ' + self.config.loc_path + ' '+ REGEX  + ' ' + "-type f -printf '%P '"
@@ -150,8 +194,19 @@ class Controller():
         return fn_list_local
     
     def __delete_remote_files(self, fn_list_to_del):
+        self.logdeleted(fn_list_to_del)
         self.log("TO BE DELETED from REMOTE!!! : \n >>> " + str(fn_list_to_del))
-
+        '''
+        Example of a complete command:
+          ssh
+          -q
+          -i /home/ams/.ssh/ams_fcern2hawaii
+          -p 25852
+          -l amscern
+          uhams02a.phys.hawaii.edu
+          "rm /home/cern/amscern/cern_to_hawaii/3782/510 /home/cern/amscern/cern_to_hawaii/3782/511 /home/cern/amscern/cern_to_hawaii/3783/.804.iGJ0Al"
+        '''
+        
         # ssh command:
         KEY = "-i " + self.config.loc_sshkey
         PORT = "-p " + str(self.config.rem_port)
@@ -162,10 +217,12 @@ class Controller():
 
         ssh_command = "ssh -q" + ' ' + KEY + ' ' + PORT + ' ' + USER + ' ' + self.config.rem_host + ' \"' + CMD + '\"'
         output = self.__popen(ssh_command)
+        #self.__logger.send_sms_via_email("deleted: " + str(fn_list_to_del))
         self.log("output:" + output)
 
         
     def __sync(self, fn_list):
+        self.logsynched(fn_list)
         for fn in fn_list:
             ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
             cmd = "rsync -Rpogt --progress " + self.config.loc_path + './' + fn + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
@@ -173,6 +230,22 @@ class Controller():
             subprocess.call(cmd, shell=True)
 
     def __syncBatch(self, fn_list):
+        self.logsynched(fn_list)
+        
+        '''
+        Example of a complete command:
+          rsync
+          -Rpogt
+          --progress
+          /Data/FRAMES/SCIBPB/RT/./3783/833 /Data/FRAMES/SCIBPB/RT/./3783/834 /Data/FRAMES/SCIBPB/RT/./3783/835
+          uhams02a.phys.hawaii.edu:/home/cern/amscern/cern_to_hawaii/
+          -e 'ssh
+              -q
+              -i
+              /home/ams/.ssh/ams_fcern2hawaii
+              -p 25852
+              -l amscern'
+        '''
 
         fnbatch = (" "+self.config.loc_path+'./').join(fn_list)
         ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
@@ -188,16 +261,22 @@ class Controller():
         # check return code
         rc = p.returncode
         if rc != 0:
-            self.logerror("Error in __get_fn_list_remote, return code = " + str(rc))
+            self.log("error output: " + err)
+            self.log("output: " + output)
+            self.logerror("Error in __popen, return code = " + str(rc))
+            self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
             exit(0)
 
         # check error output
         if len(err) != 0:
             self.log("error output: " + err)
-            self.logerror("Error in __get_fn_list_remote, error len !=0 ")
+            self.log("output: " + output)
+            self.logerror("Error in __popen, error len !=0 ")
+            self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
             exit(0)
 
         # check output
-        #self.log("output: " + output)
         return output
+
+
 
