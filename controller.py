@@ -12,38 +12,6 @@ from config import Config
 
 CHANNEL = 'pcposc1_to_uhams02a'
 
-'''
-TODO:
-
-  - ...
-
-VERSION:
-
-  - 2019.02.06
-
-
-  
-  - 2019.02.05
-
-    Add a regex to the command to find the files on the remote host (already synchronized files).
-    Otherwise, it finds a partially trasnferred file and throws an error (to be understood why).
-
-
-INVARIANTS :
-
-  - L1: list of files on the LOCAL host
-   =self.__get_fn_list_local()
-
- - L2: list of files that have already been synch'ed:
-   (and not yet deleted from remote due to >=STORAGE_SIZE)
-   =self.__get_fn_list_remote()
-
- - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
- - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
- - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
- 
-'''
-
 class Controller():
 
     def __init__(self):
@@ -257,26 +225,18 @@ class Controller():
         self.log(" ! CALL : " + cmd)
         p = subprocess.Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate()
-        
-        # check return code
-        rc = p.returncode
-        if rc != 0:
-            self.log("error output: " + err)
-            self.log("output: " + output)
-            self.logerror("Error in __popen, return code = " + str(rc))
-            self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
-            exit(0)
-
-        # check error output
-        if len(err) != 0:
-            self.log("error output: " + err)
-            self.log("output: " + output)
-            self.logerror("Error in __popen, error len !=0 ")
-            self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
-            exit(0)
-
-        # check output
+        self.__error(p.returncode, output, err)
         return output
 
 
+    def __error(self, rc, output, err):
+        if ( (rc != 0) or (len(err) != 0) ):
+            self.log("output: " + output)
+            self.log("error output: " + err)
+            self.logerror("Error in __popen, return code = " + str(rc))
+            self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
+            sleep(self.config.timeout.error)
 
+
+
+        

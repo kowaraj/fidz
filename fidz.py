@@ -1,14 +1,38 @@
 #!/usr/bin/python
 
 '''
-# Documentation:
-## Functionality
-- Keep a 'log.rsynced' file on the REMOTE side. Update after every successful transfer.
-  Read this file to obtain the list of the files which have been transferred.
-- 
-## Usage
-- no arguments for now
+TODO:
+
+  - Stay alive after a loss of the connection to UH.
+  
+
+VERSION:
+
+  - 2019.02.06
+
+    Add an alert by SMS (via pcposp0 email server).
+  
+  - 2019.02.05
+
+    Add a regex to the command to find the files on the remote host (already synchronized files).
+    Otherwise, it finds a partially trasnferred file and throws an error (to be understood why).
+
+
+INVARIANTS :
+
+  - L1: list of files on the LOCAL host
+   =self.__get_fn_list_local()
+
+ - L2: list of files that have already been synch'ed:
+   (and not yet deleted from remote due to >=STORAGE_SIZE)
+   =self.__get_fn_list_remote()
+
+ - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
+ - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
+ - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
+ 
 '''
+
 
 import os
 import sys

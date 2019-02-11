@@ -13,7 +13,10 @@
 		"batch_size"      : 3,
 		
         	"connection_freq" : 2,
-		"connection_freq_whenempty" : 60
+		"connection_freq_whenempty" : 60,
+		"timeout" : {
+			  "error" : 600}
+		
         }
 }
 

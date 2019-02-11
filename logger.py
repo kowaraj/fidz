@@ -26,19 +26,28 @@ class Logger():
             print "Error: log file not found"
             exit(0)
 
+        self.fn_err = "error.log"
+        p = self.path + self.fn_err
+        self.f_err = open(p, 'a')
+        if not os.path.isfile(p):
+            print "Error: log file not found"
+            exit(0)
+
         ts = datetime.datetime.now()
 
         self.f.write("Logger started @" + str(ts)+'\n')
         self.f_deleted.write("Logger started @" + str(ts)+'\n')
         self.f_synched.write("Logger started @" + str(ts)+'\n')
+        self.f_err.write("Logger started @" + str(ts)+'\n')
 
     def log(self, line):
         self.f.write(line)
         self.f.flush()
 
     def logerror(self, line):
-        self.f.write(line)
-        self.f.flush()
+        ts = datetime.datetime.now()
+        self.f_err.write(str(ts)+'\n'+line+'\n')
+        self.f_err.flush()
 
     def logdeleted(self, fn_list):
         ts = datetime.datetime.now()
