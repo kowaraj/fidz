@@ -9,7 +9,7 @@
 	        "loc_path"   : "/Data/FRAMES/SCIBPB/RT/",
 		"loc_sshkey" : "/home/ams/.ssh/ams_fcern2hawaii",
 	
-		"storage_size"    : 30,	
+		"storage_size"    : 300,	
 		"batch_size"      : 3,
 		
         	"connection_freq" : 2,

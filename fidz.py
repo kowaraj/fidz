@@ -3,33 +3,37 @@
 '''
 TODO:
 
-  - Stay alive after a loss of the connection to UH.
-  
 
 VERSION:
 
-  - 2019.02.06
+    2019.02.14
 
-    Add an alert by SMS (via pcposp0 email server).
+  - Changed the mail server to cernmx.cern.ch:25
+  - Removed old-never-used dumper.py file and reference to it
+  - Add global try-catch to notify with alarm
   
-  - 2019.02.05
+    2019.02.06
 
-    Add a regex to the command to find the files on the remote host (already synchronized files).
+  - Add an alert by SMS (via pcposp0 email server).
+  
+    2019.02.05
+
+  - Add a regex to the command to find the files on the remote host (already synchronized files).
     Otherwise, it finds a partially trasnferred file and throws an error (to be understood why).
 
 
 INVARIANTS :
 
   - L1: list of files on the LOCAL host
-   =self.__get_fn_list_local()
+    see: Controller.__get_fn_list_local()
 
- - L2: list of files that have already been synch'ed:
-   (and not yet deleted from remote due to >=STORAGE_SIZE)
-   =self.__get_fn_list_remote()
+  - L2: list of files that have already been synch'ed:
+    (and not yet deleted from remote due to >=STORAGE_SIZE)
+    see: Controller.__get_fn_list_remote()
 
- - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
- - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
- - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
+  - L3: list of files on the LOCAL host limited by STORAGE_SIZE (most recent)
+  - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
+  - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
  
 '''
 
@@ -62,8 +66,11 @@ if getpass.getuser() != 'ams':
 # 2. run
 	
 c = controller.Controller()
-c.log("test log")
-c.run()
+try:
+    c.run()
+except:
+    c.alarm()
+    
 
 
 

@@ -63,7 +63,6 @@ class Logger():
             self.f_synched.write(fn+'\n')
         self.f_synched.flush()
 
-
     def send_sms_via_email(self, msg):
     
         import smtplib
@@ -75,7 +74,7 @@ class Logger():
         msg['From'] = me
         msg['To'] = you
         
-        s = smtplib.SMTP('localhost:60666')
+        s = smtplib.SMTP('cernmx.cern.ch:25')
         s.sendmail(me, [you], msg.as_string())
         print 'sent'
         s.quit()

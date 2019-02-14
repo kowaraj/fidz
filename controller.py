@@ -7,7 +7,7 @@ from time import sleep
 import datetime
 
 from logger import Logger
-from dumper import Dumper
+
 from config import Config
 
 CHANNEL = 'pcposc1_to_uhams02a'
@@ -16,15 +16,13 @@ class Controller():
 
     def __init__(self):
         self.__logger = Logger()
-
+        
         self.__check_if_process_is_running()
 
         self.config = Config(CHANNEL).get()
         self.log(str(self.config))
         
         self.__L2 = []
-        self.dumper = Dumper(self.__logger)
-
     
     def __check_if_process_is_running(self):
         '''
@@ -43,6 +41,10 @@ class Controller():
             print "Process already running (%d:%s ). Exiting" % ( error_code, error_string) 
             exit(0)
         
+
+    def alarm(self):
+        self.__logger.send_sms_via_email("Unknown problem. Goodbye.")
+       
     def log(self, msg):
         self.__logger.log(msg+ '\n')
 
@@ -56,6 +58,7 @@ class Controller():
         self.__logger.logdeleted(fn_list)
 
     def run(self):
+
         fn_list_synched = self.__get_fn_list_remote()
         while (True):
             self.log("\n"+str(datetime.datetime.now()))
