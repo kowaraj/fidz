@@ -16,12 +16,10 @@ class Controller():
 
     def __init__(self):
         self.__logger = Logger()
-        
-        self.__check_if_process_is_running()
 
+        self.__check_if_process_is_running()
         self.config = Config(CHANNEL).get()
         self.log(str(self.config))
-        
         self.__L2 = []
     
     def __check_if_process_is_running(self):
@@ -42,9 +40,9 @@ class Controller():
             exit(0)
         
 
-    def alarm(self):
-        self.__logger.send_sms_via_email("Unknown problem. Goodbye.")
-       
+    def alarm(self, msg="Unknown problem. Goodbye."):
+        self.__logger.send_sms_via_email(msg)
+        
     def log(self, msg):
         self.__logger.log(msg+ '\n')
 
@@ -234,11 +232,11 @@ class Controller():
 
     def __error(self, rc, output, err):
         if ( (rc != 0) or (len(err) != 0) ):
-            self.log("output: " + output)
-            self.log("error output: " + err)
-            self.logerror("Error in __popen, return code = " + str(rc))
+            self.logerror("Error in __popen, return code = " + str(rc) + "\n" \
+                          + "error output: " + err + "\n" \
+                          + "output: " + output )
             self.__logger.send_sms_via_email("output = " + output + ", error = " + err)
-            sleep(self.config.timeout.error)
+            sleep(self.config.timeout_error)
 
 
 

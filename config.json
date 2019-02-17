@@ -14,9 +14,7 @@
 		
         	"connection_freq" : 2,
 		"connection_freq_whenempty" : 60,
-		"timeout" : {
-			  "error" : 600}
-		
-        }
+		"timeout_error" : 600
+		}
 }
 

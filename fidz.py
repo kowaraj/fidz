@@ -6,6 +6,11 @@ TODO:
 
 VERSION:
 
+    2019.02.17
+
+    BUGFIX: find threw an error (due to: fidz executed while old_frames were being deleted from the server)
+
+  
     2019.02.14
 
   - Changed the mail server to cernmx.cern.ch:25
@@ -68,8 +73,14 @@ if getpass.getuser() != 'ams':
 c = controller.Controller()
 try:
     c.run()
+except Exception as e:
+    print "Exception: " + e
+    c.alarm(str(e))
+    raise
 except:
+    print "Exception."
     c.alarm()
+    raise
     
 
 
