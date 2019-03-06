@@ -6,6 +6,11 @@ TODO:
 
 VERSION:
 
+    2019.03.06
+
+  - Add controller_pull module (to pull data from remote instead of push).
+  - Add input argument for config_channel name
+  
     2019.02.17
 
     BUGFIX: find threw an error (due to: fidz executed while old_frames were being deleted from the server)
@@ -49,16 +54,20 @@ from subprocess import call, Popen, PIPE, STDOUT
 from time import sleep
 
 import controller
+import controller_pull
+from logger import Logger
+from config import Config
 
       
 # 0. check arguments
+config_channel = "default_channel"
 
 print "Arguments provided:"
-for a in sys.argv:
-	print "    : ", a
-if len(sys.argv) != 1:
-	print "No arguments expected"
-	exit(0)
+# for a in sys.argv:
+#     print "    : ", a
+if len(sys.argv) == 2:
+    config_channel = sys.argv[1]
+    print "Argument given: config_channel = ", config_channel #pcposc1_from_localhost
 
 # 1. check the user is data
 
@@ -69,8 +78,20 @@ if getpass.getuser() != 'ams':
 
 
 # 2. run
-	
-c = controller.Controller()
+
+logger = Logger()
+
+config = Config(config_channel).get()
+logger.log(str(config))
+
+if config.mode == "push":
+    c = controller.Controller(logger, config)
+elif config.mode == "pull":
+    c = controller_pull.Controller(logger, config)
+else:
+    print "Unknown mode"
+    exit(0)
+    
 try:
     c.run()
 except Exception as e:

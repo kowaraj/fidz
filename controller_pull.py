@@ -6,7 +6,9 @@ from subprocess import PIPE, STDOUT
 from time import sleep
 import datetime
 
+from logger import Logger
 
+from config import Config
 
 class Controller():
 
@@ -14,10 +16,9 @@ class Controller():
         self.__logger = log_
 
         self.__check_if_process_is_running()
-        self.config = config_
+        self.config = config_ 
 
         self.__L2 = []
-        exit(0)
     
     def __check_if_process_is_running(self):
         '''
