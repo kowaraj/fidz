@@ -41,7 +41,7 @@ class Logger():
         self.f_err.write("Logger started @" + str(ts)+'\n')
 
     def log(self, line):
-        self.f.write(line)
+        self.f.write(line+'\n')
         self.f.flush()
 
     def logerror(self, line):

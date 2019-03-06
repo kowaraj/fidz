@@ -19,6 +19,7 @@ class Controller():
         self.config = config_ 
 
         self.__L2 = []
+
     
     def __check_if_process_is_running(self):
         '''
@@ -55,48 +56,36 @@ class Controller():
 
     def run(self):
 
-        fn_list_synched = self.__get_fn_list_remote()
         while (True):
             self.log("\n"+str(datetime.datetime.now()))
 
-            # 1. Prepare the list of files to be synchronized
-            
-            fn_list_local = self.__get_fn_list_local() # check local files
-            self.log("L1 : (part of) " + str(fn_list_local[-(self.config.storage_size+3):]))
-
-            self.log("L2 : " + str(fn_list_synched)) # check already synchronized files
-
-            fn_list_local_recent = fn_list_local[-self.config.storage_size:] # ignore old local files
-            self.log("L3 : " + str(fn_list_local_recent))
-
-            fn_list_to_sync = [x for x in fn_list_local_recent if x not in fn_list_synched] # find files to be synchronized
-            fn_list_to_sync_b = fn_list_to_sync[:self.config.batch_size]
-            self.log("L4 : " + str(fn_list_to_sync_b))
-
-            if (len(fn_list_to_sync_b)) != 0:
-
-                # 2. Run the synchronization (rsync)
-
-                self.__syncBatch(fn_list_to_sync_b)  # for single file mode: self.__sync(fn_list_to_sync_b)
-                fn_list_synched += fn_list_to_sync_b
-                self.log("L2': " + str(fn_list_synched))
-                
-            # 3. Delete oldest files from remote (clean-up)
+            # 1. Get list of REMOTE files
+            fnl_remote_all = self.__get_fn_list_remote()
+            fnl_remote = fnl_remote_all[-self.config.num_of_files:]
+            self.log("L1 : (part of) " + str(fnl_remote))
 
 
-            fn_list_to_del = fn_list_synched[:-self.config.storage_size] # find too old files on remote
-            self.log("L5 : " + str(fn_list_to_del)) # too old files on remote (to be deleted)
-            if (len(fn_list_to_del)) != 0:
-                self.__delete_remote_files(fn_list_to_del)
-                fn_list_synched = [x for x in fn_list_synched if x not in fn_list_to_del] # UPDATE synched list: Find files that were not deleted from remote
+            # 2. Get list of LOCAL files
+            fnl_local = self.__get_fn_list_local() 
+            self.log("L2 : (part of) " + str(fnl_local[-(self.config.storage_size):]))
 
-            # 4. Nothing to be done: Long wait; else: Short wait.
-                
-            if ( (len(fn_list_to_sync_b) == 0) and (len(fn_list_to_del) == 0) ):
-                self.log("No missing files. Nothing to sync. Waiting...")
+            # 3. Find list of files to rsync
+            fnl_tosync = [x for x in fnl_remote if x not in fnl_local]
+            fnl_tosync_b = fnl_tosync[:self.config.batch_size]
+            self.log("L3 : " + str(fnl_tosync_b))
+
+            # 4. Run the sync
+            self.__syncBatch(fnl_tosync_b) 
+
+            # 5. Move (atomically) just-copied-batch from temp location
+            self.__atomicMove()
+
+            # 6. Delay...
+            if ( len(fnl_tosync_b) == 0 ):
+                self.log("No new files to pull. Waiting...")
                 sleep(self.config.connection_freq_whenempty)
             else: 
-                sleep(self.config.connection_freq)
+                sleep(self.config.connection_freq) #should be 0 ?
 
     def __get_fn_list_remote(self):
         '''
@@ -160,34 +149,6 @@ class Controller():
         fn_list_local.sort()
         return fn_list_local
     
-    def __delete_remote_files(self, fn_list_to_del):
-        self.logdeleted(fn_list_to_del)
-        self.log("TO BE DELETED from REMOTE!!! : \n >>> " + str(fn_list_to_del))
-        '''
-        Example of a complete command:
-          ssh
-          -q
-          -i /home/ams/.ssh/ams_fcern2hawaii
-          -p 25852
-          -l amscern
-          uhams02a.phys.hawaii.edu
-          "rm /home/cern/amscern/cern_to_hawaii/3782/510 /home/cern/amscern/cern_to_hawaii/3782/511 /home/cern/amscern/cern_to_hawaii/3783/.804.iGJ0Al"
-        '''
-        
-        # ssh command:
-        KEY = "-i " + self.config.loc_sshkey
-        PORT = "-p " + str(self.config.rem_port)
-        USER = "-l " + str(self.config.rem_user)
-
-        fn_list = self.config.rem_path + (" " + self.config.rem_path).join(fn_list_to_del)
-        CMD = "rm " + fn_list
-
-        ssh_command = "ssh -q" + ' ' + KEY + ' ' + PORT + ' ' + USER + ' ' + self.config.rem_host + ' \"' + CMD + '\"'
-        output = self.__popen(ssh_command)
-        #self.__logger.send_sms_via_email("deleted: " + str(fn_list_to_del))
-        self.log("output:" + output)
-
-        
     def __sync(self, fn_list):
         self.logsynched(fn_list)
         for fn in fn_list:
@@ -197,7 +158,10 @@ class Controller():
             subprocess.call(cmd, shell=True)
 
     def __syncBatch(self, fn_list):
+        if (len(fn_list)) == 0:
+            return;
         self.logsynched(fn_list)
+
         
         '''
         Example of a complete command:
@@ -214,12 +178,36 @@ class Controller():
               -l amscern'
         '''
 
-        fnbatch = (" "+self.config.loc_path+'./').join(fn_list)
-        ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user)
-        cmd = "rsync -Rpogt --progress " + self.config.loc_path+'./'+fnbatch + " " + self.config.rem_host + ":" + self.config.rem_path +  " " + "-e \'" + ssh_cmd + "\'"
+        remp = " " + self.config.rem_host + ":" + self.config.rem_path + "./" # full remote path
+        fnbatch = remp + (remp).join(fn_list)
+        ssh_cmd = "ssh -q -i " + self.config.loc_sshkey + " -p " + str(self.config.rem_port) + " -l " + str(self.config.rem_user) # ssh command
+        cmd = "rsync -Rpogt --progress " + fnbatch + " " + self.config.loc_path_incomplete + " " + "-e \'" + ssh_cmd + "\'"
         self.log(" ! --->  RSYNC : " + cmd)
         subprocess.call(cmd, shell=True)
 
+    def __atomicMove(self):
+        '''
+          Find and move
+        '''
+
+        REGEX = "-regextype sed -regex \"" + self.config.loc_path_incomplete + "[0-9]\{4\}\/[0-9]\{3\}\""
+        cmd = "find" + ' ' + self.config.loc_path_incomplete + ' '+ REGEX  + ' ' + "-type f -printf '%P '"
+        output = self.__popen(cmd)
+        fnl_complete = output.rstrip(' ').split(' ')
+        fnl_complete.sort()
+
+        if ( (len(output)==0) or (len(fnl_complete)==0) ):
+            return;
+
+        for f in fnl_complete:
+            pdst = self.config.loc_path + f
+            psrc = self.config.loc_path_incomplete + f 
+            cmd_move = "mv " + psrc + " " + pdst
+            pdst_dir = os.path.dirname(pdst)
+            if not os.path.exists(pdst_dir):
+                os.mkdir(pdst_dir)
+            output = self.__popen(cmd_move)
+        
     def __popen(self, cmd):
         self.log(" ! CALL : " + cmd)
         p = subprocess.Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)

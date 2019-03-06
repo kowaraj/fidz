@@ -2,7 +2,8 @@
 
 '''
 TODO:
-
+  - Fix move-or-delete to delete incomplete files if any
+  - Fix move-or-delete to move when no folder created yet
 
 VERSION:
 
@@ -45,7 +46,18 @@ INVARIANTS :
   - L4: list of files to be synchronized as a batch (BATCH_SIZE) (oldest)
   - L5: list of files to be deleted from remove (keep only STORAGE_SIZE)
  
-'''
+
+INVARIANTS for PULL-controller:
+
+  - L1: list of files on REMOTE which we are still interested
+    see: Controller.__get_fn_list_remote()
+
+  - L2: list of files on the LOCAL host (already rsynch'ed)
+    see: Controller.__get_fn_list_local()
+    
+  - L3: list of files to be synchronized as a batch (BATCH_SIZE)
+
+  '''
 
 
 import os
@@ -91,17 +103,25 @@ elif config.mode == "pull":
 else:
     print "Unknown mode"
     exit(0)
+
+
+
+print "\nDEBUG ONLY: no Exception handling\n"
+c.run()
+exit(0)
+print "endof: DEBUG ONLY: no Exception handling"
     
-try:
-    c.run()
-except Exception as e:
-    print "Exception: " + e
-    c.alarm(str(e))
-    raise
-except:
-    print "Exception."
-    c.alarm()
-    raise
+# try:
+#     c.run()
+# except Exception as e:
+#     print "Exception: " + e
+#     c.alarm(str(e))
+#     raise
+# except:
+#     print "Exception."
+#     c.alarm()
+#     raise
+
     
 
 
