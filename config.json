@@ -40,7 +40,32 @@
         	"connection_freq" : 2,
 		"connection_freq_whenempty" : 60,
 		"timeout_error" : 600
+		},
+
+	"pcposp0_from_localhost_60666":
+	{
+		"mode"     : "pull",
+		
+        	"rem_host" : "localhost", 
+        	"rem_path" : "/Data/FRAMES/SCIBPB/RT/",
+		"rem_port" : 60666,
+		"rem_user" : "ams",
+	
+		"original_loc_path"      : "/Data/FRAMES/SCIBPB/RT/",
+	        "loc_path"               : "./temp_fidz_finaldest/",
+	        "loc_path_incomplete"    : "./temp_fidz_incomplete/",
+		"loc_sshkey"             : "/home/ams/.ssh/ams_flight_fidz",
+	
+		"num_of_files"    : 15,	
+		"storage_size"    : 5,	
+		"batch_size"      : 2,
+		
+        	"connection_freq" : 2,
+		"connection_freq_whenempty" : 60,
+		"timeout_error" : 600
 		}
+		
+
 		
 }
 

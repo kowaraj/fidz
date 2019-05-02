@@ -75,8 +75,8 @@ from config import Config
 config_channel = "default_channel"
 
 print "Arguments provided:"
-# for a in sys.argv:
-#     print "    : ", a
+for a in sys.argv:
+    print "    : ", a
 if len(sys.argv) == 2:
     config_channel = sys.argv[1]
     print "Argument given: config_channel = ", config_channel #pcposc1_from_localhost
@@ -88,8 +88,7 @@ if getpass.getuser() != 'ams':
 	print "switch user to ams"
 	exit(0)
 
-
-# 2. run
+# 2. config
 
 logger = Logger()
 
@@ -105,28 +104,20 @@ else:
     exit(0)
 
 
-
-print "\nDEBUG ONLY: no Exception handling\n"
-c.run()
-exit(0)
-print "endof: DEBUG ONLY: no Exception handling"
+# 3. run
     
-# try:
-#     c.run()
-# except Exception as e:
-#     print "Exception: " + e
-#     c.alarm(str(e))
-#     raise
-# except:
-#     print "Exception."
-#     c.alarm()
-#     raise
+try:
+    c.run()
+except Exception as e:
+    print "Exception: " + e
+    c.alarm("["+config_channel+"] "+str(e))
+    raise
+except:
+    print "Exception."
+    c.alarm("["+config_channel+"] Unknown problem. Goodbye.")
+    raise
 
     
-
-
-
-
 # The End.
 
 
